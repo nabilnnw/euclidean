@@ -42,6 +42,118 @@
 }
 
 
+// Midpoint
+#let midpoint(A, B) = {
+  // 1. Parse inputs to ensure they are Cartesian coordinates
+  let p1 = parse(A)
+  let p2 = parse(B)
+  
+  // 2. Average the coordinates: (A + B) / 2
+  return div(add(p1, p2), 2)
+}
+
+
+// Centroid
+#let centroid(A, B, C) = {
+  // 1. Parse inputs to ensure they are Cartesian coordinates
+  let p1 = parse(A)
+  let p2 = parse(B)
+  let p3 = parse(C)
+  
+  // 2. The Centroid is the average: (A + B + C) / 3
+  return div(add(add(p1, p2), p3), 3)
+}
+
+
+// Find point P on AB such that PA/PB = r
+#let point-ratio(A, B, r) = {
+  let p1 = parse(A)
+  let p2 = parse(B)
+  
+  // To make PA/PB = r:
+  // P = (1 * A + r * B) / (1 + r)
+  let weight_a = 1 / (1 + r)
+  let weight_b = r / (1 + r)
+  
+  return add(mul(p1, weight_a), mul(p2, weight_b))
+}
+
+
+// Incenter
+#let incenter(A, B, C) = {
+  let p1 = parse(A)
+  let p2 = parse(B)
+  let p3 = parse(C)
+  
+  // 1. Calculate side lengths
+  let a = dist(p2, p3) // side BC
+  let b = dist(p1, p3) // side AC
+  let c = dist(p1, p2) // side AB
+  
+  let total_perimeter = a + b + c
+  
+  // 2. Weighted average of vertices
+  let p_weighted = add(
+    add(mul(p1, a), mul(p2, b)), 
+    mul(p3, c)
+  )
+  
+  return div(p_weighted, total_perimeter)
+}
+
+
+// Inradius
+#let inradius(A, B, C) = {
+  let p1 = parse(A)
+  let p2 = parse(B)
+  let p3 = parse(C)
+  
+  // 1. Calculate side lengths
+  let a = dist(p2, p3)
+  let b = dist(p1, p3)
+  let c = dist(p1, p2)
+  
+  // 2. Semi-perimeter (s)
+  let s = (a + b + c) / 2
+  
+  // 3. Area (K) using Heron's Formula
+  let area = calc.sqrt(s * (s - a) * (s - b) * (s - c))
+  
+  // 4. Radius r = Area / Semi-perimeter
+  return area / s
+}
+
+
+// Angle bisector of angle ABC (returns 1 point)
+#let angle-bisector(A, B, C, length: 1) = {
+  let pA = parse(A)
+  let pB = parse(B)
+  let pC = parse(C)
+
+  let v_ba = sub(pA, pB)
+  let v_bc = sub(pC, pB)
+  
+  let d_ba = dist(pB, pA)
+  let d_bc = dist(pB, pC)
+
+  // Safety: If points are on B, default to unit vectors to avoid div-by-zero
+  let u_ba = if d_ba < 1e-9 { (1, 0) } else { div(v_ba, d_ba) }
+  let u_bc = if d_bc < 1e-9 { (1, 0) } else { div(v_bc, d_bc) }
+
+  let v_bisect = add(u_ba, u_bc)
+  let d_bisect = vec.len(v_bisect)
+
+  if d_bisect < 1e-9 {
+    // 180-degree case: B is between A and C
+    let perp = (-u_ba.at(1), u_ba.at(0))
+    return add(pB, mul(perp, length))
+  } else {
+    // Normal case
+    return add(pB, mul(div(v_bisect, d_bisect), length))
+  }
+}
+
+
 // Draw dot for points
 #let dot(pt, radius: 0.05, fill: black, stroke: none, ..args) = {
   // 1. Check if pt is a single coordinate (Cartesian, Polar, or Named)
@@ -151,50 +263,66 @@
 }
 
 
+// Helper to handle (Center, Radius) or (Center, PointOnCircle)
+// For tangent functions
+#let _get-radius(O, arg) = {
+  if type(arg) == float or type(arg) == int {
+    return float(arg)
+  }
+  return dist(O, arg)
+}
+
+
 // Line-Circle Intersection (Returns an array of 0, 1, or 2 points)
-#let iLC(A, B, O, r) = {
-  // 1. Normalize inputs
-  let O_pt = parse(O)
-  let A_pt = sub(A, O_pt) // Shift origin to circle center
-  let B_pt = sub(B, O_pt)
+// R can be a numeric radius or a point on the circumference
+#let iLC(A, B, O, R) = {
+  // 1. Normalize inputs and handle radius extraction
+  let p_o = parse(O)
+  let r = _get-radius(p_o, R)
+  let p_a = sub(parse(A), p_o) // Shift origin to circle center
+  let p_b = sub(parse(B), p_o)
   
-  let (x1, y1) = A_pt
-  let (x2, y2) = B_pt
+  let (x1, y1) = p_a
+  let (x2, y2) = p_b
   
   let dx = x2 - x1
   let dy = y2 - y1
   let dr2 = calc.pow(dx, 2) + calc.pow(dy, 2)
-  let D = x1 * y2 - x2 * y1
+  let det = x1 * y2 - x2 * y1 // Determinant
   
-  // 2. Discriminant
-  let disc = calc.pow(r, 2) * dr2 - calc.pow(D, 2)
+  // 2. Discriminant calculation
+  let disc = calc.pow(r, 2) * dr2 - calc.pow(det, 2)
   
   // 3. Floating point safety check
   if disc < -1e-9 { return () }
+  
   // Treat tiny negatives or tiny positives as tangent (1 point)
   let is_tangent = calc.abs(disc) < 1e-9
   let sqrt_disc = if is_tangent { 0 } else { calc.sqrt(disc) }
   
-  // 4. Sign of dy (standard geometric convention)
+  // 4. Sign of dy (standard geometric convention for intersection order)
   let sgn_dy = if dy < 0 { -1 } else { 1 }
   
-  let x_part1 = D * dy
+  let x_part1 = det * dy
   let x_part2 = sgn_dy * dx * sqrt_disc
-  let y_part1 = -D * dx
+  let y_part1 = -det * dx
   let y_part2 = calc.abs(dy) * sqrt_disc
   
-  let p1 = add(O_pt, ((x_part1 + x_part2)/dr2, (y_part1 + y_part2)/dr2))
-  let p2 = add(O_pt, ((x_part1 - x_part2)/dr2, (y_part1 - y_part2)/dr2))
+  let p1 = add(p_o, ((x_part1 + x_part2)/dr2, (y_part1 + y_part2)/dr2))
+  let p2 = add(p_o, ((x_part1 - x_part2)/dr2, (y_part1 - y_part2)/dr2))
   
   if is_tangent { (p1,) } else { (p1, p2) }
 }
 
 
 // Circle-Circle Intersection (Returns an array of 0, 1, or 2 points)
-#let iCC(O1, r1, O2, r2) = {
-  // 1. Normalize inputs
+// R1 and R2 can be numeric radii or points on the respective circumferences
+#let iCC(O1, R1, O2, R2) = {
+  // 1. Normalize inputs and handle radius extraction
   let p1 = parse(O1)
   let p2 = parse(O2)
+  let r1 = _get-radius(p1, R1)
+  let r2 = _get-radius(p2, R2)
   
   let d_vec = sub(p2, p1)
   let d = vec.len(d_vec)
@@ -214,7 +342,7 @@
   let p_base = add(p1, mul(d_vec, a / d))
   
   // 6. Offset by h in the perpendicular direction
-  // Perpendicular vector to (dx, dy) is (-dy, dx)
+  // Perpendicular vector to (dx, dy) is (dy, -dx)
   let (dx, dy) = d_vec
   
   let i1 = (
@@ -227,4 +355,213 @@
   )
   
   if is_tangent { (i1,) } else { (i1, i2) }
+}
+
+
+// Projection of point P onto line segment AB (Foot of the altitude)
+#let projection(P, A, B) = {
+  // 1. Normalize all inputs to 2D Cartesian
+  let p = parse(P)
+  let a = parse(A)
+  let b = parse(B)
+  
+  // 2. Create vectors for the line (ab) and the point (ap)
+  let ab = sub(b, a)
+  let ap = sub(p, a)
+  
+  // 3. Use the scalar projection formula: (ap · ab) / |ab|²
+  // How far along the line AB the projection sits
+  let ab_len_sq = calc.pow(vec.len(ab), 2)
+  
+  if ab_len_sq < 1e-9 { return a } // Safety for zero-length lines
+  
+  let t = vec.dot(ap, ab) / ab_len_sq
+  
+  // 4. Result = A + t * (B - A)
+  return add(a, mul(ab, t))
+}
+
+
+// Orthocenter
+#let orthocenter(A, B, C) = {
+  // 1. Find the foot of the altitude from A to line BC
+  let Ha = projection(A, B, C)
+  
+  // 2. Find the foot of the altitude from B to line AC
+  let Hb = projection(B, A, C)
+  
+  // 3. The Orthocenter is the intersection of altitudes AH_a and BH_b
+  return iLL(A, Ha, B, Hb)
+}
+
+
+// Perpendicular Bisector of AB (return 2 points defining the line)
+#let perp-bisector(A, B, length: 1) = {
+  let p1 = parse(A)
+  let p2 = parse(B)
+  
+  // 1. Find the midpoint
+  let mid = div(add(p1, p2), 2)
+  
+  // 2. Get the vector AB and its perpendicular (-dy, dx)
+  let v = sub(p2, p1)
+  let perp = (-v.at(1), v.at(0))
+  
+  // 3. Normalize the perpendicular vector
+  let d = vec.len(perp)
+  if d < 1e-9 { return (mid, mid) }
+  let unit_perp = div(perp, d)
+  
+  // 4. Return two points extending from the midpoint
+  let start = add(mid, mul(unit_perp, length))
+  let end = sub(mid, mul(unit_perp, length))
+  
+  return (start, end)
+}
+
+
+// Circumcenter
+#let circumcenter(A, B, C) = {
+  // 1. Get two points on the bisector of AB
+  let (p1, p2) = perp-bisector(A, B)
+  // 2. Get two points on the bisector of BC
+  let (p3, p4) = perp-bisector(B, C)
+  
+  // 3. The intersection is the circumcenter
+  return iLL(p1, p2, p3, p4)
+}
+
+
+// Circumradius
+#let circumradius(A, B, C) = {
+  // 1. Find the circumcenter first
+  let O = circumcenter(A, B, C)
+  
+  // 2. The radius is the distance from the center to any vertex
+  return dist(O, A)
+}
+
+
+// Returns point P such that PA is perpendicular to BC and dist(P, A) = length
+#let perp-through(A, B, C, length: 1) = {
+  let pA = parse(A)
+  let pB = parse(B)
+  let pC = parse(C)
+
+  // 1. Get the direction vector of the base line BC
+  let v = sub(pC, pB)
+  let d = dist(pB, pC)
+
+  // 2. Safety: handle zero-length base line
+  if d < 1e-9 { return add(pA, (0, length)) }
+
+  // 3. Rotate the vector 90° CCW: (dx, dy) -> (-dy, dx)
+  let perp = (-(v.at(1)), v.at(0))
+  
+  // 4. Normalize and scale to the target length in one step
+  return add(pA, mul(perp, length / d))
+}
+
+// Returns point P such that PA is parallel to BC and dist(P, A) = length
+#let parallel-through(A, B, C, length: 1) = {
+  let pA = parse(A)
+  let pB = parse(B)
+  let pC = parse(C)
+
+  // 1. Get the direction vector of the base line BC
+  let v = sub(pC, pB)
+  let d = dist(pB, pC)
+
+  // 2. Safety: handle zero-length base line
+  if d < 1e-9 { return add(pA, (length, 0)) }
+
+  // 3. Normalize and scale the direction vector BC to the target length
+  return add(pA, mul(v, length / d))
+}
+
+
+// Returns (T1, T2) representing the two tangent points from P to circle(O, R)
+// R can be a numeric radius or a point on the circumference
+#let tangent-points(P, O, R) = {
+  let p_p = parse(P)
+  let p_o = parse(O)
+  let r = _get-radius(p_o, R)
+  
+  // 1. Calculate distance from the external point to the center
+  let d = dist(p_p, p_o)
+  
+  // 2. Safety: If P is inside the circle, no tangents can be drawn
+  if d < r - 1e-9 { return none }
+  
+  // 3. Special Case: If P is exactly on the circle, return P twice
+  if calc.abs(d - r) < 1e-9 { return (p_p, p_p) }
+  
+  // 4. Calculate distance from P to the tangent points using Pythagoras
+  // The radius is perpendicular to the tangent line at the point of contact
+  let l = calc.sqrt(calc.pow(d, 2) - calc.pow(r, 2))
+  
+  // 5. The tangent points are the intersection of:
+  //    Circle A: center O, radius r
+  //    Circle B: center P, radius l
+  return iCC(p_o, r, p_p, l)
+}
+
+
+// Returns ((A1, B1), (A2, B2)) for external tangents between circles
+// A1, A2 are on Circle 1; B1, B2 are on Circle 2
+#let external-tangents(O1, R1, O2, R2) = {
+  let p1 = parse(O1)
+  let p2 = parse(O2)
+  let r1 = _get-radius(p1, R1)
+  let r2 = _get-radius(p2, R2)
+  let d = dist(p1, p2)
+  
+  // 1. Safety: check if one circle is inside the other
+  if d <= calc.abs(r1 - r2) or d < 1e-9 { return none }
+  
+  // 2. Case: Equal radii (tangents are parallel to the center line)
+  if calc.abs(r1 - r2) < 1e-9 {
+    let p_unit = div(sub(p2, p1), d)
+    let n = (-(p_unit.at(1)), p_unit.at(0)) // Perpendicular unit vector
+    
+    return (
+      (add(p1, mul(n, r1)), add(p2, mul(n, r1))),
+      (sub(p1, mul(n, r1)), sub(p2, mul(n, r1)))
+    )
+  }
+  
+  // 3. Case: Different radii. Find external center of homothety H
+  // H = (r1*P2 - r2*P1) / (r1 - r2)
+  let h = div(sub(mul(p2, r1), mul(p1, r2)), r1 - r2)
+  
+  // 4. Find tangent points from H to both circles
+  let (A1, A2) = tangent-points(h, p1, r1)
+  let (B1, B2) = tangent-points(h, p2, r2)
+  
+  return ((A1, B1), (A2, B2))
+}
+
+// Returns ((A1, B1), (A2, B2)) for internal tangents between circles
+// A1, A2 are on Circle 1; B1, B2 are on Circle 2
+#let internal-tangents(O1, R1, O2, R2) = {
+  let p1 = parse(O1)
+  let p2 = parse(O2)
+  let r1 = _get-radius(p1, R1)
+  let r2 = _get-radius(p2, R2)
+  let d = dist(p1, p2)
+  
+  // 1. Safety: internal tangents only exist if circles do not overlap
+  if d < (r1 + r2) { return none }
+  
+  // 2. Find internal center of homothety H (lies between the circles)
+  // H = (r2*P1 + r1*P2) / (r1 + r2)
+  let h = div(add(mul(p1, r2), mul(p2, r1)), r1 + r2)
+  
+  // 3. Find tangent points from H to both circles
+  let (A1, A2) = tangent-points(h, p1, r1)
+  let (B1, B2) = tangent-points(h, p2, r2)
+  
+  // 4. For internal tangents, the image is inverted through H.
+  // A1 pairs with B2 and A2 pairs with B1 to form the "X" shape.
+  return ((A1, B2), (A2, B1))
 }
