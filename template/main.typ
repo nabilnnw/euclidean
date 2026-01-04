@@ -2,23 +2,8 @@
 #import "@local/euclidean:0.1.0": *
 
 #show: mathjestic.with(
-  // draft: true,
   color: "emerald",
-  social: ( // Can only show the first 4 at the moment
-    whatsapp: "6282337293909",
-    instagram: "mathjestic.id",
-    // youtube: "mathjestic",
-    // github: "nabilnnw",
-  ),
-  // outline: true,
-  lastupdate: true,
-  website: "mathjestic.id",
-  // titlepage: "1",
-  // printsol: true,
-  // pslink: true,
   title: "Euclidean",
-  author: "Nabil Nabawi Wibisono",
-  // abstract: "The easier you try to make your life, the harder it is going to be. You avoid hardships, risks, and constant improvement without realizing that when you try to stay the same, you don't stay the same. You slowly drown in problems until it is ten times harder to get out."
 )
 
 Still purely cartesian coordinate.
