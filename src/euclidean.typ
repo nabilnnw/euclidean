@@ -549,7 +549,7 @@
 
 
 // Draw dot for points
-#let dot(pt, radius: 0.05, fill: black, stroke: none, ..args) = {
+#let dot(pt, radius: 0.05, fill: black, stroke: none, z-level: 10, ..args) = {
   // 1. Check if pt is a single coordinate (Cartesian, Polar, or Named)
   let is_single = type(pt) == str or (
     type(pt) == array and pt.len() >= 2 and type(pt.at(0)) in (int, float, length, angle)
@@ -558,45 +558,60 @@
   // 2. Normalize input into an array of points for the loop
   let points = if is_single { (pt,) } else { pt }
 
-  for p in points {
-    draw.circle(
-      p,
-      radius: radius,
-      fill: fill,
-      stroke: stroke,
-      ..args
-    )
-  }
+  // Draw dots on a high layer so they aren't covered by lines or fills
+  draw.on-layer(z-level, {
+    for p in points {
+      draw.circle(
+        p,
+        radius: radius,
+        fill: fill,
+        stroke: stroke,
+        ..args
+      )
+    }
+  })
 }
 
 
 // Draw segment
-#let segment(p1, p2, extend: 0, ..args) = {
+#let segment(p1, p2, extend: 0, z-level: 0, ..args) = {
   let A = parse(p1)
   let B = parse(p2)
   
   // 1. Handle extension values: allow uniform (scaler) or per-end (array)
   let (e1, e2) = if type(extend) == array { extend } else { (extend, extend) }
   
-  // 2. Fast path for standard segments
-  if e1 == 0 and e2 == 0 {
-    draw.line(A, B, ..args)
-  } else {
-    let d = sub(B, A)
-    let len = vec.len(d)
-    
-    // 3. Prevent division by zero for coincident points
-    if len == 0 {
+  draw.on-layer(z-level, {
+    // 2. Fast path for standard segments
+    if e1 == 0 and e2 == 0 {
       draw.line(A, B, ..args)
     } else {
-      // 4. Calculate unit direction and shift start/end points outward
-      let unit = div(d, len)
-      let start = sub(A, mul(unit, e1))
-      let end = add(B, mul(unit, e2))
+      let d = sub(B, A)
+      let len = vec.len(d)
       
-      draw.line(start, end, ..args)
+      // 3. Prevent division by zero for coincident points
+      if len == 0 {
+        draw.line(A, B, ..args)
+      } else {
+        // 4. Calculate unit direction and shift start/end points outward
+        let unit = div(d, len)
+        let start = sub(A, mul(unit, e1))
+        let end = add(B, mul(unit, e2))
+        
+        draw.line(start, end, ..args)
+      }
     }
-  }
+  })
+}
+
+
+// Wrapper for native CeTZ circle to add default layering
+#let circ(center, z-level: -1, ..args) = {
+  // We pass the layer directly as a named argument if the native 
+  // CeTZ circle supports it, or wrap it strictly:
+  draw.on-layer(z-level, {
+    draw.circle(center, ..args)
+  })
 }
 
 
@@ -745,7 +760,7 @@
 
 
 // Label points
-#let label(pt, texts, angle: -90deg, dist: 0.3, anchor: "center", boxed: false, ..args) = {
+#let label(pt, texts, angle: -90deg, dist: 0.3, anchor: "center", boxed: false, z-level: 20, ..args) = {
   // 1. Normalize inputs: allow single values or arrays for points and text
   let is_single_pt = type(pt) == str or (
     type(pt) == array and pt.len() >= 2 and type(pt.at(0)) in (int, float, length, angle)
@@ -755,22 +770,24 @@
   let points = if is_single_pt { (pt,) } else { pt }
   let labels = if is_single_txt { (texts,) } else { texts }
 
-  for (i, p) in points.enumerate() {
-    // 2. Pick corresponding label; fallback to the last one if points > labels
-    let txt = labels.at(i, default: labels.last())
-    
-    // 3. Calculate offset position using polar vector math
-    let pos = add(p, (angle, dist))
-    
-    draw.content(
-      pos,
-      txt,
-      anchor: anchor,
-      fill: if boxed { white } else { none },
-      padding: 0,
-      frame: if boxed { "rect" } else { none },
-      stroke: none,
-      ..args
-    )
-  }
+  draw.on-layer(z-level, {
+    for (i, p) in points.enumerate() {
+      // 2. Pick corresponding label; fallback to the last one if points > labels
+      let txt = labels.at(i, default: labels.last())
+      
+      // 3. Calculate offset position using polar vector math
+      let pos = add(p, (angle, dist))
+      
+      draw.content(
+        pos,
+        txt,
+        anchor: anchor,
+        fill: if boxed { white } else { none },
+        padding: 0.05,
+        frame: if boxed { "rect" } else { none },
+        stroke: none,
+        ..args
+      )
+    }
+  })
 }
