@@ -615,6 +615,32 @@
 }
 
 
+// Draws the circumcircle of triangle ABC
+#let circumcircle(A, B, C, z-level: -1, ..args) = {
+  // 1. Calculate the circumcenter O
+  let O = circumcenter(A, B, C)
+  
+  // 2. Use the 'circ' wrapper
+  // O is the center, and point A defines the radius via the CeTZ radius/point logic
+  circ(O, A, z-level: z-level, ..args)
+}
+
+
+// Draws the incircle of triangle ABC
+#let incircle(A, B, C, z-level: -1, ..args) = {
+  // 1. Calculate the incenter I
+  let I = incenter(A, B, C)
+  
+  // 2. Find the "touch point" (projection of I onto side AB)
+  // The distance from I to this point is the inradius
+  let touch_pt = projection(I, A, B)
+  
+  // 3. Use the 'circ' wrapper
+  // I is the center, and touch_pt defines the radius
+  circ(I, touch_pt, z-level: z-level, ..args)
+}
+
+
 // ==================================================
 // Mark
 // ==================================================
