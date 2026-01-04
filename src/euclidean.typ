@@ -96,7 +96,7 @@
   if full_dist < 1e-9 { return p_a }
 
   // 2. Determine direction and anchor
-  // We calculate the unit vector of the segment
+  // Calculate the unit vector of the segment
   let v_unit = div(sub(p_b, p_a), full_dist)
 
   if from_b {
@@ -607,7 +607,7 @@
 
 // Wrapper for native CeTZ circle to add default layering
 #let circ(center, z-level: -1, ..args) = {
-  // We pass the layer directly as a named argument if the native 
+  // Pass the layer directly as a named argument if the native 
   // CeTZ circle supports it, or wrap it strictly:
   draw.on-layer(z-level, {
     draw.circle(center, ..args)
