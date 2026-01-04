@@ -791,3 +791,64 @@
     }
   })
 }
+
+
+// Labels a segment AB with text
+#let label-segment(A, B, txt, pos: 0.5, dist: 0.2, side: left, boxed: false, z-level: 20, ..args) = {
+  let p_a = parse(A)
+  let p_b = parse(B)
+  
+  // 1. Convert pos (0-1) to ratio r for point-ratio
+  // Avoid division by zero at pos = 1
+  let r = if pos >= 1 { 999999 } else { pos / (1 - pos) }
+  let target_pt = point-ratio(p_a, p_b, r)
+  
+  // 2. Calculate the angle of the segment to find the perpendicular
+  let v = sub(p_b, p_a)
+  let segment_angle = calc.atan2(v.at(0), v.at(1))
+  
+  // 3. Determine the offset angle
+  // If we follow A -> B, left is +90deg, right is -90deg
+  let offset_angle = if side == left { segment_angle + 90deg } else { segment_angle - 90deg }
+  
+  // 4. Reuse label function
+  label(
+    target_pt, 
+    txt, 
+    angle: offset_angle,
+    dist: dist,
+    boxed: boxed, 
+    z-level: z-level, 
+    ..args
+  )
+}
+
+
+// Labels a circle or arc at a specific angle
+// center: the center of the circle
+// radius-or-pt: the radius (float/int) or a point on the circumference
+// angle: the polar angle where the label should be placed
+// side: 1 for outer (default), -1 for inner
+#let label-circle(center, radius-or-pt, angle, txt, dist: 0.3, side: 1, boxed: false, z-level: 20, ..args) = {
+  let p_c = parse(center)
+  
+  // 1. Use helper to resolve the radius
+  let r = _get-radius(p_c, radius-or-pt)
+  
+  // 2. Calculate the point on the circumference
+  let pt_on_circ = add(p_c, (angle, r))
+  
+  // 3. Determine push direction (angle for outer, angle + 180 for inner)
+  let push_angle = if side == 1 { angle } else { angle + 180deg }
+  
+  // 4. Reuse label function
+  label(
+    pt_on_circ, 
+    txt, 
+    angle: push_angle, 
+    dist: dist, 
+    boxed: boxed, 
+    z-level: z-level, 
+    ..args
+  )
+}
