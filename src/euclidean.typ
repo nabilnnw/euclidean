@@ -605,38 +605,42 @@
 // ==================================================
 
 
-// Mark right angle
-#let mark-right-angle(A, B, C, size: 0.2, ..style) = {
+// Draws a square "hook" at vertex B to indicate a 90-degree angle.
+// A and C are points on the legs, B is the vertex.
+#let mark-right-angle(A, B, C, size: 0.2, z-level: -2, 
+  stroke: (thickness: 0.5pt, paint: fuchsia), 
+  fill: fuchsia.lighten(80%), ..style) = {
+  
   let p_a = parse(A)
   let p_b = parse(B)
   let p_c = parse(C)
 
+  // Unit vectors to ensure the mark remains a perfect square
   let v_ba = div(sub(p_a, p_b), dist(p_a, p_b))
   let v_bc = div(sub(p_c, p_b), dist(p_c, p_b))
   
-  let p1 = add(p_b, mul(v_ba, size))
-  let p3 = add(p_b, mul(v_bc, size))
-  let p2 = add(p1, mul(v_bc, size))
+  let p1 = add(p_b, mul(v_ba, size))         
+  let p3 = add(p_b, mul(v_bc, size))         
+  let p2 = add(p1, mul(v_bc, size))          
 
-  let s_map = style.named()
-
-  // Use draw.on-layer to push the mark behind other geometry
-  draw.on-layer(-2, {
-    // 1. Fill (Polygon)
-    if "fill" in s_map {
-      draw.line(p1, p2, p3, p_b, close: true, stroke: none, fill: s_map.at("fill"))
+  draw.on-layer(z-level, {
+    // Fill the square (p1-p2-p3-B)
+    if fill != none {
+      draw.line(p1, p2, p3, p_b, close: true, stroke: none, fill: fill)
     }
 
-    // 2. Stroke (L-shape only)
-    let stroke_style = style.named()
-    let _ = stroke_style.remove("fill", default: none)
-    draw.line(p1, p2, p3, ..stroke_style)
+    // Draw the "hook" (p1-p2-p3) using the default stroke
+    draw.line(p1, p2, p3, stroke: stroke, ..style)
   })
 }
 
 
-// Mark angle
-#let mark-angle(A, B, C, radius: 0.3, count: 1, spacing: 0.05, reflex: false, ..style) = {
+// Draws one or more circular arcs centered at vertex B to mark an angle.
+// Supports inner/reflex angles, multiple arc counts, and fills.
+#let mark-angle(A, B, C, radius: 0.3, count: 1, spacing: 0.05, reflex: false, z-level: -2, 
+  stroke: (thickness: 0.5pt, paint: red),
+  fill: red.lighten(80%), ..style) = {
+  
   let p_a = parse(A)
   let p_b = parse(B)
   let p_c = parse(C)
@@ -647,67 +651,89 @@
   let ang_a = calc.atan2(v_ba.at(0), v_ba.at(1))
   let ang_c = calc.atan2(v_bc.at(0), v_bc.at(1))
 
-  // 1. Calculate the signed difference
   let diff = ang_a - ang_c
-  
-  // 2. Normalize for the "inner" angle first
   if diff > 180deg { diff -= 360deg }
   if diff < -180deg { diff += 360deg }
   
-  // 3. If reflex is requested, flip to the "long way"
   if reflex {
     if diff > 0deg { diff -= 360deg }
     else { diff += 360deg }
   }
   
   let final_stop = ang_c + diff
-  let s_map = style.named()
 
-  draw.on-layer(-1, {
+  draw.on-layer(z-level, {
     let fill_radius = radius + (count - 1) * spacing
 
-    if "fill" in s_map {
+    // Use "PIE" mode for the wedge fill
+    if fill != none {
       draw.arc(p_b, start: ang_c, stop: final_stop, radius: fill_radius, 
-               anchor: "origin", mode: "PIE", stroke: none, fill: s_map.at("fill"))
+               anchor: "origin", mode: "PIE", stroke: none, fill: fill)
     }
-
-    let stroke_style = style.named()
-    let _ = stroke_style.remove("fill", default: none)
     
+    // Draw the arcs
     for i in range(count) {
       let r = radius + (i * spacing)
-      draw.arc(p_b, start: ang_c, stop: final_stop, radius: r, anchor: "origin", ..stroke_style)
+      draw.arc(p_b, start: ang_c, stop: final_stop, radius: r, anchor: "origin", stroke: stroke, ..style)
     }
   })
 }
 
 
-// Draws tick marks on segment AB to show they are congruent
-// count: number of ticks (1, 2, or 3)
-// size: the total length of the tick mark line
-// spacing: the distance between ticks if count > 1
-#let mark-segment(A, B, count: 1, size: 0.15, spacing: 0.05, ..style) = {
+// Draws tick marks on segment AB to show they are congruent.
+// Ticks are centered on the midpoint of the segment.
+#let mark-segment(A, B, count: 1, size: 0.13, spacing: 0.05, z-level: 9, 
+  stroke: (thickness: 0.5pt), ..style) = {
   let p_a = parse(A)
   let p_b = parse(B)
   
   // 1. Find the midpoint of the segment
-  let mid = point-ratio(p_a, p_b, 1) // Using your existing 1:1 ratio function
+  let mid = point-ratio(p_a, p_b, 1) 
   
-  // 2. Loop to draw the number of ticks requested
-  draw.on-layer(-1, {
+  draw.on-layer(z-level, {
     for i in range(count) {
-      // Calculate an offset so the group of ticks is centered exactly on the midpoint
+      // Offset the ticks so the group is centered on the midpoint
       let offset_val = (i - (count - 1) / 2) * spacing
-      
-      // Find the center point of THIS specific tick
       let tick_center = point-on-line(p_a, p_b, dist(p_a, mid) + offset_val)
       
-      // 3. Draw a short perpendicular line through that center
-      // We use perp-through to find the endpoints relative to the segment direction
+      // Calculate perpendicular endpoints for the tick
       let p1 = perp-through(tick_center, p_a, p_b, length: size / 2)
       let p2 = perp-through(tick_center, p_b, p_a, length: size / 2)
       
-      draw.line(p1, p2, ..style)
+      draw.line(p1, p2, stroke: stroke, ..style)
+    }
+  })
+}
+
+
+// Draws arrow (chevron) marks on segment AB to show they are parallel.
+// Arrows point from A towards B.
+#let mark-parallel(A, B, count: 1, size: 0.1, spacing: 0.12, z-level: 9, 
+  stroke: (thickness: 0.5pt), ..style) = {
+  let p_a = parse(A)
+  let p_b = parse(B)
+  
+  // 1. Get direction and perpendicular vectors
+  let v = sub(p_b, p_a)
+  let d = dist(p_a, p_b)
+  let unit = div(v, d)
+  let perp = (-unit.at(1), unit.at(0))
+  
+  draw.on-layer(z-level, {
+    for i in range(count) {
+      // Center the group of arrows on the midpoint
+      let offset_val = (i - (count - 1) / 2) * spacing
+      let tip = point-on-line(p_a, p_b, d/2 + offset_val)
+      
+      // Calculate "wings" of the chevron relative to the line direction
+      let wing_back = mul(unit, size)
+      let wing_out = mul(perp, size * 0.8) 
+      
+      let p1 = add(sub(tip, wing_back), wing_out)
+      let p2 = add(sub(tip, wing_back), mul(wing_out, -1))
+      
+      // Draw chevron path (wing1 -> tip -> wing2)
+      draw.line(p1, tip, p2, stroke: stroke, ..style)
     }
   })
 }
