@@ -239,7 +239,7 @@
 
 
 // Line-Line Intersection (Returns a single point or none)
-#let iLL(A, B, C, D) = {
+#let inter-LL(A, B, C, D) = {
   // 1. Normalize inputs
   let (x1, y1) = parse(A)
   let (x2, y2) = parse(B)
@@ -275,7 +275,7 @@
 
 // Line-Circle Intersection (Returns an array of 0, 1, or 2 points)
 // R can be a numeric radius or a point on the circumference
-#let iLC(A, B, O, R) = {
+#let inter-LC(A, B, O, R) = {
   // 1. Normalize inputs and handle radius extraction
   let p_o = parse(O)
   let r = _get-radius(p_o, R)
@@ -317,7 +317,7 @@
 
 // Circle-Circle Intersection (Returns an array of 0, 1, or 2 points)
 // R1 and R2 can be numeric radii or points on the respective circumferences
-#let iCC(O1, R1, O2, R2) = {
+#let inter-CC(O1, R1, O2, R2) = {
   // 1. Normalize inputs and handle radius extraction
   let p1 = parse(O1)
   let p2 = parse(O2)
@@ -391,7 +391,7 @@
   let Hb = projection(B, A, C)
   
   // 3. The Orthocenter is the intersection of altitudes AH_a and BH_b
-  return iLL(A, Ha, B, Hb)
+  return inter-LL(A, Ha, B, Hb)
 }
 
 
@@ -428,7 +428,7 @@
   let (p3, p4) = perp-bisector(B, C)
   
   // 3. The intersection is the circumcenter
-  return iLL(p1, p2, p3, p4)
+  return inter-LL(p1, p2, p3, p4)
 }
 
 
@@ -503,7 +503,7 @@
   // 5. The tangent points are the intersection of:
   //    Circle A: center O, radius r
   //    Circle B: center P, radius l
-  return iCC(p_o, r, p_p, l)
+  return inter-CC(p_o, r, p_p, l)
 }
 
 
