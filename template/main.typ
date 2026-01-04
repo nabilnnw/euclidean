@@ -62,3 +62,33 @@ Still purely cartesian coordinate.
 
 
 = Segment
+
+#cetz.canvas({
+  import cetz.draw: *
+
+  let O = (0, 0)
+  let A = (1, 2)
+  let B = (3, 3)
+  let C = (4, 0)
+  let D = (30deg, 1)
+  let F = (8, 1)
+
+  circle(C, radius: 3, stroke: blue)
+  circle(F, radius: dist(F, C), stroke: green)
+
+  segment(O, A, extend: (1, 2))
+  segment(A, B, C, close: true) // Can still do this
+
+  let E = iLL(O, D, A, C)
+
+  let P = iLC(O, D, C, 3)
+  let P2 = P.at(0)
+  let P1 = P.at(1)
+
+  let Q = iCC(C, 3, F, dist(F, C))
+  let Q1 = Q.at(0)
+  let Q2 = Q.at(1)
+
+  dot((O, A, B, C, D, E, P1, P2, F, Q1, Q2))
+  label((O, A, B, C, D, E, P1, P2, F, Q1, Q2), ($O$, $A$, $B$, $C$, $D$, $E$, $P_1$, $P_2$, $F$, $Q_1$, $Q_2$))
+})
