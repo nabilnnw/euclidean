@@ -1,6 +1,11 @@
 #import "@preview/cetz:0.4.2"
 
 
+// ==================================================
+// Define and Create
+// ==================================================
+
+
 // Shorthand for ease of use
 #let (draw, vec) = (cetz.draw, cetz.vector)
 
@@ -79,6 +84,32 @@
 }
 
 
+// Returns a point P on the line AB at a specific distance from A (or B)
+// d: the absolute distance from the anchor point
+// from_b: if true, distance is measured from B towards A. If false, from A towards B.
+#let point-on-line(A, B, d, from_b: false) = {
+  let p_a = parse(A)
+  let p_b = parse(B)
+  let full_dist = dist(p_a, p_b)
+
+  // 1. Safety: if A and B are the same point
+  if full_dist < 1e-9 { return p_a }
+
+  // 2. Determine direction and anchor
+  // We calculate the unit vector of the segment
+  let v_unit = div(sub(p_b, p_a), full_dist)
+
+  if from_b {
+    // Start at B and move distance 'd' in the direction of A
+    // The vector from B to A is the negative of v_unit
+    return sub(p_b, mul(v_unit, d))
+  } else {
+    // Start at A and move distance 'd' in the direction of B
+    return add(p_a, mul(v_unit, d))
+  }
+}
+
+
 // Incenter
 #let incenter(A, B, C) = {
   let p1 = parse(A)
@@ -150,90 +181,6 @@
   } else {
     // Normal case
     return add(pB, mul(div(v_bisect, d_bisect), length))
-  }
-}
-
-
-// Draw dot for points
-#let dot(pt, radius: 0.05, fill: black, stroke: none, ..args) = {
-  // 1. Check if pt is a single coordinate (Cartesian, Polar, or Named)
-  let is_single = type(pt) == str or (
-    type(pt) == array and pt.len() >= 2 and type(pt.at(0)) in (int, float, length, angle)
-  )
-
-  // 2. Normalize input into an array of points for the loop
-  let points = if is_single { (pt,) } else { pt }
-
-  for p in points {
-    draw.circle(
-      p,
-      radius: radius,
-      fill: fill,
-      stroke: stroke,
-      ..args
-    )
-  }
-}
-
-
-// Label points
-#let label(pt, texts, angle: -90deg, dist: 0.3, anchor: "center", boxed: false, ..args) = {
-  // 1. Normalize inputs: allow single values or arrays for points and text
-  let is_single_pt = type(pt) == str or (
-    type(pt) == array and pt.len() >= 2 and type(pt.at(0)) in (int, float, length, angle)
-  )
-  let is_single_txt = type(texts) in (str, content)
-  
-  let points = if is_single_pt { (pt,) } else { pt }
-  let labels = if is_single_txt { (texts,) } else { texts }
-
-  for (i, p) in points.enumerate() {
-    // 2. Pick corresponding label; fallback to the last one if points > labels
-    let txt = labels.at(i, default: labels.last())
-    
-    // 3. Calculate offset position using polar vector math
-    let pos = add(p, (angle, dist))
-    
-    draw.content(
-      pos,
-      txt,
-      anchor: anchor,
-      fill: if boxed { white } else { none },
-      padding: 0,
-      frame: if boxed { "rect" } else { none },
-      stroke: none,
-      ..args
-    )
-  }
-}
-
-
-// Draw segment
-#let segment(p1, p2, extend: 0, ..args) = {
-  let A = parse(p1)
-  let B = parse(p2)
-  
-  // 1. Handle extension values: allow uniform (scaler) or per-end (array)
-  let (e1, e2) = if type(extend) == array { extend } else { (extend, extend) }
-  
-  // 2. Fast path for standard segments
-  if e1 == 0 and e2 == 0 {
-    draw.line(A, B, ..args)
-  } else {
-    let d = sub(B, A)
-    let len = vec.len(d)
-    
-    // 3. Prevent division by zero for coincident points
-    if len == 0 {
-      draw.line(A, B, ..args)
-    } else {
-      // 4. Calculate unit direction and shift start/end points outward
-      let unit = div(d, len)
-      let start = sub(A, mul(unit, e1))
-      let end = add(B, mul(unit, e2))
-      
-      draw.line(start, end, ..args)
-    }
   }
 }
 
@@ -564,4 +511,240 @@
   // 4. For internal tangents, the image is inverted through H.
   // A1 pairs with B2 and A2 pairs with B1 to form the "X" shape.
   return ((A1, B2), (A2, B1))
+}
+
+
+// Returns a point on a circle at a given angle
+// R: numeric radius or a point on the circumference
+// rel: if true and R is a point, angle is relative to the direction OR
+#let point-on-circle(O, R, angle, rel: false) = {
+  let p_o = parse(O)
+  let r = _get-radius(p_o, R)
+  
+  // 1. Determine the starting (base) angle
+  let base_angle = 0deg
+  if rel and type(R) != float and type(R) != int {
+    let p_r = parse(R)
+    let v = sub(p_r, p_o)
+    // calc.atan2(y, x) returns the angle of the vector
+    base_angle = calc.atan2(v.at(0), v.at(1))
+  }
+
+  // 2. Calculate final angle in radians
+  let total_angle = base_angle + angle * 1deg
+
+  // 3. Calculate the offset from center O
+  let offset = (
+    r * calc.cos(total_angle),
+    r * calc.sin(total_angle)
+  )
+
+  return add(p_o, offset)
+}
+
+
+// ==================================================
+// Draw
+// ==================================================
+
+
+// Draw dot for points
+#let dot(pt, radius: 0.05, fill: black, stroke: none, ..args) = {
+  // 1. Check if pt is a single coordinate (Cartesian, Polar, or Named)
+  let is_single = type(pt) == str or (
+    type(pt) == array and pt.len() >= 2 and type(pt.at(0)) in (int, float, length, angle)
+  )
+
+  // 2. Normalize input into an array of points for the loop
+  let points = if is_single { (pt,) } else { pt }
+
+  for p in points {
+    draw.circle(
+      p,
+      radius: radius,
+      fill: fill,
+      stroke: stroke,
+      ..args
+    )
+  }
+}
+
+
+// Draw segment
+#let segment(p1, p2, extend: 0, ..args) = {
+  let A = parse(p1)
+  let B = parse(p2)
+  
+  // 1. Handle extension values: allow uniform (scaler) or per-end (array)
+  let (e1, e2) = if type(extend) == array { extend } else { (extend, extend) }
+  
+  // 2. Fast path for standard segments
+  if e1 == 0 and e2 == 0 {
+    draw.line(A, B, ..args)
+  } else {
+    let d = sub(B, A)
+    let len = vec.len(d)
+    
+    // 3. Prevent division by zero for coincident points
+    if len == 0 {
+      draw.line(A, B, ..args)
+    } else {
+      // 4. Calculate unit direction and shift start/end points outward
+      let unit = div(d, len)
+      let start = sub(A, mul(unit, e1))
+      let end = add(B, mul(unit, e2))
+      
+      draw.line(start, end, ..args)
+    }
+  }
+}
+
+
+// ==================================================
+// Mark
+// ==================================================
+
+
+// Mark right angle
+#let mark-right-angle(A, B, C, size: 0.2, ..style) = {
+  let p_a = parse(A)
+  let p_b = parse(B)
+  let p_c = parse(C)
+
+  let v_ba = div(sub(p_a, p_b), dist(p_a, p_b))
+  let v_bc = div(sub(p_c, p_b), dist(p_c, p_b))
+  
+  let p1 = add(p_b, mul(v_ba, size))
+  let p3 = add(p_b, mul(v_bc, size))
+  let p2 = add(p1, mul(v_bc, size))
+
+  let s_map = style.named()
+
+  // Use draw.on-layer to push the mark behind other geometry
+  draw.on-layer(-2, {
+    // 1. Fill (Polygon)
+    if "fill" in s_map {
+      draw.line(p1, p2, p3, p_b, close: true, stroke: none, fill: s_map.at("fill"))
+    }
+
+    // 2. Stroke (L-shape only)
+    let stroke_style = style.named()
+    let _ = stroke_style.remove("fill", default: none)
+    draw.line(p1, p2, p3, ..stroke_style)
+  })
+}
+
+
+// Mark angle
+#let mark-angle(A, B, C, radius: 0.3, count: 1, spacing: 0.05, reflex: false, ..style) = {
+  let p_a = parse(A)
+  let p_b = parse(B)
+  let p_c = parse(C)
+
+  let v_ba = sub(p_a, p_b)
+  let v_bc = sub(p_c, p_b)
+  
+  let ang_a = calc.atan2(v_ba.at(0), v_ba.at(1))
+  let ang_c = calc.atan2(v_bc.at(0), v_bc.at(1))
+
+  // 1. Calculate the signed difference
+  let diff = ang_a - ang_c
+  
+  // 2. Normalize for the "inner" angle first
+  if diff > 180deg { diff -= 360deg }
+  if diff < -180deg { diff += 360deg }
+  
+  // 3. If reflex is requested, flip to the "long way"
+  if reflex {
+    if diff > 0deg { diff -= 360deg }
+    else { diff += 360deg }
+  }
+  
+  let final_stop = ang_c + diff
+  let s_map = style.named()
+
+  draw.on-layer(-1, {
+    let fill_radius = radius + (count - 1) * spacing
+
+    if "fill" in s_map {
+      draw.arc(p_b, start: ang_c, stop: final_stop, radius: fill_radius, 
+               anchor: "origin", mode: "PIE", stroke: none, fill: s_map.at("fill"))
+    }
+
+    let stroke_style = style.named()
+    let _ = stroke_style.remove("fill", default: none)
+    
+    for i in range(count) {
+      let r = radius + (i * spacing)
+      draw.arc(p_b, start: ang_c, stop: final_stop, radius: r, anchor: "origin", ..stroke_style)
+    }
+  })
+}
+
+
+// Draws tick marks on segment AB to show they are congruent
+// count: number of ticks (1, 2, or 3)
+// size: the total length of the tick mark line
+// spacing: the distance between ticks if count > 1
+#let mark-segment(A, B, count: 1, size: 0.15, spacing: 0.05, ..style) = {
+  let p_a = parse(A)
+  let p_b = parse(B)
+  
+  // 1. Find the midpoint of the segment
+  let mid = point-ratio(p_a, p_b, 1) // Using your existing 1:1 ratio function
+  
+  // 2. Loop to draw the number of ticks requested
+  draw.on-layer(-1, {
+    for i in range(count) {
+      // Calculate an offset so the group of ticks is centered exactly on the midpoint
+      let offset_val = (i - (count - 1) / 2) * spacing
+      
+      // Find the center point of THIS specific tick
+      let tick_center = point-on-line(p_a, p_b, dist(p_a, mid) + offset_val)
+      
+      // 3. Draw a short perpendicular line through that center
+      // We use perp-through to find the endpoints relative to the segment direction
+      let p1 = perp-through(tick_center, p_a, p_b, length: size / 2)
+      let p2 = perp-through(tick_center, p_b, p_a, length: size / 2)
+      
+      draw.line(p1, p2, ..style)
+    }
+  })
+}
+
+
+// ==================================================
+// Label
+// ==================================================
+
+
+// Label points
+#let label(pt, texts, angle: -90deg, dist: 0.3, anchor: "center", boxed: false, ..args) = {
+  // 1. Normalize inputs: allow single values or arrays for points and text
+  let is_single_pt = type(pt) == str or (
+    type(pt) == array and pt.len() >= 2 and type(pt.at(0)) in (int, float, length, angle)
+  )
+  let is_single_txt = type(texts) in (str, content)
+  
+  let points = if is_single_pt { (pt,) } else { pt }
+  let labels = if is_single_txt { (texts,) } else { texts }
+
+  for (i, p) in points.enumerate() {
+    // 2. Pick corresponding label; fallback to the last one if points > labels
+    let txt = labels.at(i, default: labels.last())
+    
+    // 3. Calculate offset position using polar vector math
+    let pos = add(p, (angle, dist))
+    
+    draw.content(
+      pos,
+      txt,
+      anchor: anchor,
+      fill: if boxed { white } else { none },
+      padding: 0,
+      frame: if boxed { "rect" } else { none },
+      stroke: none,
+      ..args
+    )
+  }
 }
