@@ -548,8 +548,8 @@
 // ==================================================
 
 
-// Draw dot for points
-#let dot(pt, radius: 0.05, fill: black, stroke: none, z-level: 10, ..args) = {
+// Draw point for points
+#let point(pt, radius: 0.05, fill: black, stroke: none, z-level: 10, ..args) = {
   // 1. Check if pt is a single coordinate (Cartesian, Polar, or Named)
   let is_single = type(pt) == str or (
     type(pt) == array and pt.len() >= 2 and type(pt.at(0)) in (int, float, length, angle)
@@ -558,7 +558,7 @@
   // 2. Normalize input into an array of points for the loop
   let points = if is_single { (pt,) } else { pt }
 
-  // Draw dots on a high layer so they aren't covered by lines or fills
+  // Draw points on a high layer so they aren't covered by lines or fills
   draw.on-layer(z-level, {
     for p in points {
       draw.circle(
