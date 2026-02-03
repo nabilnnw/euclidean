@@ -878,3 +878,45 @@
     ..args
   )
 }
+
+
+#let arc-between(O, A, B, radius: none, mode: "minor", ..style) = {
+  import cetz.draw
+  import cetz.util: vector
+
+  let p_o = O
+  let p_a = A
+  let p_b = B
+
+  // Calculate vectors relative to center O
+  let v_a = vector.sub(p_a, p_o)
+  let v_b = vector.sub(p_b, p_o)
+
+  // Get angles
+  let start_ang = calc.atan2(v_a.at(0), v_a.at(1))
+  let end_ang = calc.atan2(v_b.at(0), v_b.at(1))
+
+  // Calculate the difference and normalize it to [-180deg, 180deg]
+  let diff = end_ang - start_ang
+  while diff <= -180deg { diff += 360deg }
+  while diff > 180deg { diff -= 360deg }
+
+  // Adjust for major arc if requested
+  if mode == "major" {
+    if diff > 0deg { diff -= 360deg }
+    else { diff += 360deg }
+  }
+
+  let final_stop = start_ang + diff
+
+  // Use distance to A if radius is not specified
+  let r = if radius == none { vector.len(v_a) } else { radius }
+
+  draw.arc(p_o, 
+    start: start_ang, 
+    stop: final_stop, 
+    radius: r, 
+    anchor: "origin", 
+    ..style
+  )
+}
