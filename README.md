@@ -1,0 +1,1 @@
+I made this to imitate [tkz-euclide](https://github.com/al-ma-dev/tkz-euclide) from LaTeX by Alain Matthes. But now there is a more complete official package alternative: [ctz-euclide](https://github.com/nathan-ed/typst-package-ctz-euclide) by [nathan-ed](https://github.com/nathan-ed)
